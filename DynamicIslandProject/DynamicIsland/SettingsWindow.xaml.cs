@@ -448,7 +448,7 @@ public partial class SettingsWindow : Window
 
     private void AddButton(Panel page, string title, string? subtitle, string buttonText, Action click)
     {
-        var button = new Button { Style = (Style)FindResource("PillButton"), Content = buttonText, Padding = new Thickness(16, 7) };
+        var button = new Button { Style = (Style)FindResource("PillButton"), Content = buttonText, Padding = new Thickness(16, 7, 16, 7) };
         button.Click += (_, _) => click();
         page.Children.Add(MakeRow(title, subtitle, button));
     }
