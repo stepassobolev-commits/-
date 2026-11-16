@@ -25,6 +25,9 @@ public sealed class AppSettings
     public double ExpandedRadius { get; set; } = 32;
     public bool FlatTop { get; set; } = false;
     public double TopOffset { get; set; } = 8;
+    public double UiScale { get; set; } = 0.85;
+    public double MediaExtraWidth { get; set; } = 64;
+    public bool SmoothMode { get; set; } = false;
 
     // ---------- Анимация ----------
     public bool AnimationsEnabled { get; set; } = true;

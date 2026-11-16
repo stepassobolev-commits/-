@@ -171,6 +171,8 @@ public partial class SettingsWindow : Window
             refreshPage: true);
         AddSlider(page, "Ширина капсулы", 120, 320, () => S.CompactWidth, v => S.CompactWidth = v, " px");
         AddSlider(page, "Высота капсулы", 26, 56, () => S.CompactHeight, v => S.CompactHeight = v, " px");
+        AddSlider(page, "Размер интерфейса", 60, 130, () => S.UiScale * 100, v => S.UiScale = v / 100, " %");
+        AddSlider(page, "Ширина при музыке", 0, 140, () => S.MediaExtraWidth, v => S.MediaExtraWidth = v, " px");
         AddSlider(page, "Скругление капсулы", 0, 28, () => S.CompactRadius, v => S.CompactRadius = v, " px");
         AddSlider(page, "Скругление раскрытой панели", 8, 44, () => S.ExpandedRadius, v => S.ExpandedRadius = v, " px");
         AddSlider(page, "Отступ сверху", 0, 60, () => S.TopOffset, v => S.TopOffset = v, " px");
@@ -204,6 +206,23 @@ public partial class SettingsWindow : Window
             () => S.Use24Hour ? 0 : 1, index => S.Use24Hour = index == 0);
         AddSwitch(page, "Показывать секунды", null, () => S.ShowSeconds, v => S.ShowSeconds = v);
         AddSwitch(page, "Запускать вместе с Windows", null, AutoStart.IsEnabled, AutoStart.Set);
+        AddSwitch(page, "Плавный режим отрисовки (бета)",
+            "Меньше рывков при раскрытии. Нужен перезапуск. Если вместо острова виден чёрный прямоугольник — выключите.",
+            () => S.SmoothMode, v => S.SmoothMode = v);
+        AddButton(page, "Перезапустить программу", "Чтобы применить режим отрисовки", "Перезапустить", RestartApp);
+    }
+
+    private static void RestartApp()
+    {
+        AppSettings.SaveNow();
+        var path = Environment.ProcessPath;
+        if (path is null) return;
+        Process.Start(new ProcessStartInfo("cmd.exe", $"/c ping 127.0.0.1 -n 3 >nul & start \"\" \"{path}\"")
+        {
+            CreateNoWindow = true,
+            UseShellExecute = false
+        });
+        Application.Current.Shutdown();
     }
 
     private void BuildClipboard(Panel page)

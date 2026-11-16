@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 using System.IO;
 using System.Threading;
 using System.Collections.ObjectModel;
@@ -85,7 +88,6 @@ public partial class MainWindow : Window
     private bool _expanded;
     private bool _refreshingMedia;
     private bool _volumeUpdateFromCode;
-    private bool _eqOn;
     private bool _ready;
     private bool _applying;
 
@@ -96,6 +98,38 @@ public partial class MainWindow : Window
     private bool _rendering;
     private TimeSpan _lastRender = TimeSpan.Zero;
 
+    // Пружина ширины капсулы при музыке и «биты» эквалайзера.
+    private double _wp;
+    private double _wv;
+    private double _wTarget;
+    private bool _mediaActive;
+    private bool _playing;
+    private double _level;
+    private double _cacheScale;
+    private IntPtr _hwnd;
+    private bool _smoothReady;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Margins
+    {
+        public int Left;
+        public int Right;
+        public int Top;
+        public int Bottom;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+    private ScaleTransform[] _bars = Array.Empty<ScaleTransform>();
+    private readonly Stopwatch _beatClock = Stopwatch.StartNew();
+    private readonly DispatcherTimer _beatTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+
     private GlobalSystemMediaTransportControlsSessionManager? _mediaManager;
     private readonly MMDeviceEnumerator _enumerator = new();
     private MMDevice? _audioDevice;
@@ -103,6 +137,9 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Режим отрисовки выбирается до показа окна: «плавный» (через DWM) или «совместимый» (прозрачное окно).
+        AllowsTransparency = !S.SmoothMode;
+        _bars = new[] { EqScale1, EqScale2, EqScale3, EqScale4 };
         ClipboardItems.ItemsSource = _history;
         _history.CollectionChanged += (_, _) => UpdateEmptyState();
         UpdateEmptyState();
@@ -113,6 +150,7 @@ public partial class MainWindow : Window
         _collapseTimer.Tick += (_, _) => OnCollapseTimer();
         _expandTimer.Tick += (_, _) => OnExpandTimer();
         _statusTimer.Tick += (_, _) => { _statusTimer.Stop(); StatusText.Text = ""; };
+        _beatTimer.Tick += (_, _) => OnBeatTick();
 
         Loaded += async (_, _) =>
         {
@@ -127,17 +165,79 @@ public partial class MainWindow : Window
             RefreshVolume();
 
             await InitializeMediaAsync();
-            _mediaTimer.Tick += async (_, _) => await RefreshMediaAsync();
+            _mediaTimer.Tick += async (_, _) =>
+            {
+                if (_audioDevice is null) RefreshVolume();
+                await RefreshMediaAsync();
+            };
             _mediaTimer.Start();
         };
 
         StateChanged += (_, _) => { if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal; };
     }
 
+    // ---------- Плавный режим: окно повторяет размер острова ----------
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (!S.SmoothMode) return;
+
+        try
+        {
+            _hwnd = new WindowInteropHelper(this).Handle;
+            var source = HwndSource.FromHwnd(_hwnd);
+            if (source?.CompositionTarget is not null) source.CompositionTarget.BackgroundColor = Colors.Transparent;
+
+            // Прозрачность средствами DWM: окно рисуется видеокартой и показывается синхронно с экраном.
+            var margins = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+            DwmExtendFrameIntoClientArea(_hwnd, ref margins);
+
+            var doNotRound = 1;                                   // без скруглений и рамки Windows 11
+            DwmSetWindowAttribute(_hwnd, 33, ref doNotRound, sizeof(int));
+            var noBorder = unchecked((int)0xFFFFFFFE);
+            DwmSetWindowAttribute(_hwnd, 34, ref noBorder, sizeof(int));
+
+            _smoothReady = true;
+            PositionSmoothWindow(RootBorder.Width, RootBorder.Height);
+        }
+        catch
+        {
+            _smoothReady = false;
+        }
+    }
+
+    /// <summary>Размер и положение окна точно по острову: прозрачные края не перехватывают мышь.</summary>
+    private void PositionSmoothWindow(double localWidth, double localHeight)
+    {
+        if (!_smoothReady || _hwnd == IntPtr.Zero || double.IsNaN(localWidth) || double.IsNaN(localHeight)) return;
+
+        var s = S;
+        var scale = Math.Clamp(s.UiScale, 0.5, 1.5);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var area = SystemParameters.WorkArea;
+
+        var widthDip = Math.Max(1.0, localWidth * scale);
+        var heightDip = Math.Max(1.0, (s.TopOffset + localHeight) * scale);
+
+        var widthPx = (int)Math.Ceiling(widthDip * dpi.DpiScaleX);
+        var heightPx = (int)Math.Ceiling(heightDip * dpi.DpiScaleY);
+        var xPx = (int)Math.Round((area.Left + (area.Width - widthDip) / 2.0) * dpi.DpiScaleX);
+        var yPx = (int)Math.Round(area.Top * dpi.DpiScaleY);
+
+        // SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS
+        SetWindowPos(_hwnd, IntPtr.Zero, xPx, yPx, widthPx, heightPx, 0x0004 | 0x0010 | 0x0100);
+    }
+
     // ---------- Положение окна ----------
 
     private void PositionWindow()
     {
+        if (_smoothReady)
+        {
+            PositionSmoothWindow(RootBorder.Width, RootBorder.Height);
+            return;
+        }
         var area = SystemParameters.WorkArea;
         Left = area.Left + (area.Width - Width) / 2;
         Top = area.Top;
@@ -198,8 +298,6 @@ public partial class MainWindow : Window
         _expanded = true;
 
         UpdateClock();
-        RefreshVolume();
-        _ = RefreshMediaAsync();
         SetTarget(1);
     }
 
@@ -217,12 +315,30 @@ public partial class MainWindow : Window
         _target = target;
         if (!S.AnimationsEnabled)
         {
-            StopRendering();
             _p = target;
             _v = 0;
             ApplyProgress();
+            OnMotionSettled();
             return;
         }
+        EnsureRendering();
+    }
+
+    private void SetMediaWide(bool wide)
+    {
+        _wTarget = wide ? 1.0 : 0.0;
+        if (!S.AnimationsEnabled)
+        {
+            _wp = _wTarget;
+            _wv = 0;
+            ApplyProgress();
+            return;
+        }
+        EnsureRendering();
+    }
+
+    private void EnsureRendering()
+    {
         if (_rendering) return;
         _rendering = true;
         _lastRender = TimeSpan.Zero;
@@ -234,6 +350,18 @@ public partial class MainWindow : Window
         if (!_rendering) return;
         CompositionTarget.Rendering -= OnRendering;
         _rendering = false;
+    }
+
+    private static void Integrate(ref double x, ref double v, double target, double stiffness, double damping, double dt)
+    {
+        var steps = Math.Max(1, (int)Math.Ceiling(dt / (1.0 / 240.0)));
+        var h = dt / steps;
+        for (var i = 0; i < steps; i++)
+        {
+            var acceleration = -stiffness * (x - target) - damping * v;
+            v += acceleration * h;
+            x += v * h;
+        }
     }
 
     private void OnRendering(object? sender, EventArgs e)
@@ -253,25 +381,37 @@ public partial class MainWindow : Window
         // Пружина: жёсткость и затухание берутся из настроек.
         var stiffness = Math.Max(50.0, S.AnimationStiffness);
         var damping = 2.0 * Math.Clamp(S.AnimationDamping, 0.3, 1.0) * Math.Sqrt(stiffness);
-        var steps = Math.Max(1, (int)Math.Ceiling(dt / (1.0 / 240.0)));
-        var h = dt / steps;
-        for (var i = 0; i < steps; i++)
-        {
-            var acceleration = -stiffness * (_p - _target) - damping * _v;
-            _v += acceleration * h;
-            _p += _v * h;
-        }
+        Integrate(ref _p, ref _v, _target, stiffness, damping, dt);
+        Integrate(ref _wp, ref _wv, _wTarget, stiffness, damping, dt);
 
-        if (Math.Abs(_p - _target) < 0.0008 && Math.Abs(_v) < 0.01)
+        var settledP = Math.Abs(_p - _target) < 0.0008 && Math.Abs(_v) < 0.01;
+        var settledW = Math.Abs(_wp - _wTarget) < 0.0008 && Math.Abs(_wv) < 0.01;
+        if (settledP)
         {
             _p = _target;
             _v = 0;
-            ApplyProgress();
-            StopRendering();
-            return;
+        }
+        if (settledW)
+        {
+            _wp = _wTarget;
+            _wv = 0;
         }
 
         ApplyProgress();
+
+        if (settledP && settledW)
+        {
+            StopRendering();
+            OnMotionSettled();
+        }
+    }
+
+    /// <summary>Тяжёлые операции (звуковое устройство, плеер) выполняем только когда движение закончилось.</summary>
+    private void OnMotionSettled()
+    {
+        if (!_expanded) return;
+        RefreshVolume();
+        _ = RefreshMediaAsync();
     }
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
@@ -283,7 +423,8 @@ public partial class MainWindow : Window
         var g = Math.Max(0.0, p);
 
         var s = S;
-        var width = Lerp(s.CompactWidth, ExpandedW, g);
+        var compactNow = s.CompactWidth + s.MediaExtraWidth * Math.Clamp(_wp, 0.0, 1.15);
+        var width = Lerp(compactNow, ExpandedW, g);
         var height = Lerp(s.CompactHeight, ExpandedH, g);
         RootBorder.Width = width;
         RootBorder.Height = height;
@@ -305,6 +446,8 @@ public partial class MainWindow : Window
         if (CompactPanel.Visibility != compactVisibility) CompactPanel.Visibility = compactVisibility;
 
         PanelShift.Y = (1.0 - Clamp01(p)) * -14.0;
+
+        if (_smoothReady) PositionSmoothWindow(width, height);
     }
 
     // ---------- Часы ----------
@@ -322,7 +465,7 @@ public partial class MainWindow : Window
         var time = FormatClock(now);
         ClockText.Text = time;
         ClockBig.Text = time;
-        var date = now.ToString("dddd, d MMMM", ru);
+        var date = now.ToString("ddd, d MMMM", ru);
         DateText.Text = char.ToUpper(date[0], ru) + date[1..];
     }
 
@@ -360,9 +503,13 @@ public partial class MainWindow : Window
         StatusText.Foreground = accent;
         ProgressFill.Background = accent;
         foreach (var bar in EqPanel.Children.OfType<System.Windows.Shapes.Rectangle>()) bar.Fill = accent;
-        EqPanel.Visibility = _eqOn && s.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
+        EqPanel.Visibility = _mediaActive && s.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
 
         RootBorder.Margin = new Thickness(0, s.TopOffset, 0, 0);
+        IslandScale.ScaleX = s.UiScale;
+        IslandScale.ScaleY = s.UiScale;
+        UpdateCacheScale(s.UiScale);
+        SizeWindow();
 
         PlayerCard.Visibility = s.ShowPlayer ? Visibility.Visible : Visibility.Collapsed;
         VolumeRow.Visibility = s.ShowVolume ? Visibility.Visible : Visibility.Collapsed;
@@ -375,6 +522,36 @@ public partial class MainWindow : Window
 
         UpdateClock();
         ApplyProgress();
+    }
+
+    /// <summary>Кэш в виде картинки: панель не перерисовывается на каждом кадре анимации.</summary>
+    private void UpdateCacheScale(double uiScale)
+    {
+        var dpi = 1.0;
+        try { dpi = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
+        var scale = Math.Max(0.5, uiScale * dpi);
+        if (Math.Abs(scale - _cacheScale) < 0.001 && ExpandedPanel.CacheMode is not null) return;
+
+        _cacheScale = scale;
+        ExpandedPanel.CacheMode = new BitmapCache(scale) { EnableClearType = false, SnapsToDevicePixels = false };
+        CompactPanel.CacheMode = new BitmapCache(scale) { EnableClearType = false, SnapsToDevicePixels = false };
+    }
+
+    /// <summary>Размер окна подстраивается под масштаб интерфейса и больше не меняется во время анимации.</summary>
+    private void SizeWindow()
+    {
+        if (_smoothReady)
+        {
+            PositionSmoothWindow(RootBorder.Width, RootBorder.Height);
+            return;
+        }
+        var s = S;
+        var scale = Math.Clamp(s.UiScale, 0.5, 1.5);
+        var width = (ExpandedW + 80.0) * scale;
+        var height = (s.TopOffset + ExpandedH * 1.1 + 24.0) * scale;
+        if (Math.Abs(Width - width) > 0.5) Width = width;
+        if (Math.Abs(Height - height) > 0.5) Height = height;
+        if (IsLoaded) PositionWindow();
     }
 
     // ---------- Буфер обмена ----------
@@ -538,17 +715,60 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SetPlayingUi(bool playing)
+    private void SetMediaState(bool active, bool playing)
     {
-        PlayIcon.Data = (Geometry)FindResource(playing ? "PauseGeo" : "PlayGeo");
-        SetEqualizer(playing);
+        var icon = (Geometry)FindResource(playing ? "PauseGeo" : "PlayGeo");
+        PlayIcon.Data = icon;
+        CompactPlayIcon.Data = icon;
+        _playing = playing;
+
+        CompactPlayButton.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+        EqPanel.Visibility = active && S.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
+        CompactArtBox.Visibility = active && CompactArt.Source is not null ? Visibility.Visible : Visibility.Collapsed;
+
+        if (active != _mediaActive)
+        {
+            _mediaActive = active;
+            SetMediaWide(active);
+        }
+
+        if (playing)
+        {
+            if (!_beatTimer.IsEnabled) _beatTimer.Start();
+        }
+        else
+        {
+            _beatTimer.Stop();
+            _level = 0;
+            foreach (var bar in _bars) bar.ScaleY = 0.25;
+        }
+    }
+
+    /// <summary>Полоски двигаются в такт реальной громкости звука, который воспроизводит Windows.</summary>
+    private void OnBeatTick()
+    {
+        if (!_playing || _bars.Length == 0 || CompactPanel.Visibility != Visibility.Visible) return;
+
+        var peak = 0.0;
+        try { peak = _audioDevice?.AudioMeterInformation.MasterPeakValue ?? 0.0; }
+        catch { _audioDevice = null; }
+
+        var target = Math.Sqrt(Math.Clamp(peak, 0.0, 1.0));
+        _level = target > _level ? target : _level * 0.84 + target * 0.16;
+
+        var t = _beatClock.Elapsed.TotalSeconds;
+        for (var i = 0; i < _bars.Length; i++)
+        {
+            var wobble = 0.65 + 0.35 * Math.Sin(t * (6.0 + i * 1.7) + i * 1.3);
+            _bars[i].ScaleY = 0.22 + 0.78 * Math.Clamp(_level * 1.7 * wobble, 0.0, 1.0);
+        }
     }
 
     private void SetNoMedia()
     {
         TrackTitle.Text = "Ничего не играет";
-        TrackArtist.Text = "Запустите музыку в Spotify или другом плеере";
-        SetPlayingUi(false);
+        TrackArtist.Text = "Откройте плеер";
+        SetMediaState(false, false);
         ProgressFill.Width = 0;
         ElapsedText.Text = "0:00";
         RemainingText.Text = "";
@@ -590,9 +810,10 @@ public partial class MainWindow : Window
                 CompactArtBox.Visibility = art is null ? Visibility.Collapsed : Visibility.Visible;
             }
 
-            var playing = session.GetPlaybackInfo().PlaybackStatus ==
-                          GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
-            SetPlayingUi(playing);
+            var status = session.GetPlaybackInfo().PlaybackStatus;
+            var playing = status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
+            var active = playing || status == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused;
+            SetMediaState(active, playing);
             UpdateProgress();
         }
         catch { }
@@ -639,34 +860,6 @@ public partial class MainWindow : Window
         return t.TotalHours >= 1
             ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
             : $"{t.Minutes}:{t.Seconds:00}";
-    }
-
-    private void SetEqualizer(bool on)
-    {
-        if (on == _eqOn) return;
-        _eqOn = on;
-        EqPanel.Visibility = on && S.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
-
-        var bars = new[] { EqScale1, EqScale2, EqScale3, EqScale4 };
-        var durations = new[] { 420, 330, 500, 380 };
-        for (var i = 0; i < bars.Length; i++)
-        {
-            if (on)
-            {
-                var animation = new DoubleAnimation(0.25, 1.0, TimeSpan.FromMilliseconds(durations[i]))
-                {
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever,
-                    EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-                };
-                bars[i].BeginAnimation(ScaleTransform.ScaleYProperty, animation);
-            }
-            else
-            {
-                bars[i].BeginAnimation(ScaleTransform.ScaleYProperty, null);
-                bars[i].ScaleY = 0.3;
-            }
-        }
     }
 
     private static async Task<BitmapImage?> LoadArtAsync(GlobalSystemMediaTransportControlsSessionMediaProperties info)
@@ -771,6 +964,7 @@ public partial class MainWindow : Window
         _collapseTimer.Stop();
         _expandTimer.Stop();
         _statusTimer.Stop();
+        _beatTimer.Stop();
         _audioDevice?.Dispose();
         _enumerator.Dispose();
         base.OnClosed(e);
