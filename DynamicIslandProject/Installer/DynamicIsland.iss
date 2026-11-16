@@ -1,5 +1,5 @@
 #define MyAppName "Dynamic Island"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.5.0"
 #define MyAppPublisher "Dynamic Island"
 #define MyAppExeName "DynamicIsland.exe"
 
@@ -34,6 +34,7 @@ Name: "desktopicon"; Description: "Создать ярлык на рабочем
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Запустить Dynamic Island"; Flags: postinstall nowait skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--background"; Flags: nowait; Check: WizardSilent
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "DynamicIsland"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "DynamicIsland"; ValueData: """{app}\{#MyAppExeName}"" --background"; Flags: uninsdeletevalue; Tasks: autostart

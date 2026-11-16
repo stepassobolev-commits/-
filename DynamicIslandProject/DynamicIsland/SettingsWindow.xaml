@@ -1,0 +1,107 @@
+<Window x:Class="DynamicIsland.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dynamic Island — настройки" Width="940" Height="720" MinWidth="820" MinHeight="600"
+        Background="#1E1E20" Foreground="#F2F2F7" WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource TextFont}" AllowDrop="True" UseLayoutRounding="True"
+        SourceInitialized="Window_SourceInitialized" Closing="Window_Closing"
+        DragOver="Window_DragOver" DragLeave="Window_DragLeave" Drop="Window_Drop">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Боковая панель -->
+        <Border Background="#252528">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="22,26,20,18">
+                    <TextBlock Text="Dynamic Island" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="VersionText" FontSize="11" Foreground="#98989D" Margin="0,3,0,0"/>
+                </StackPanel>
+                <StackPanel x:Name="NavPanel" Margin="10,0"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Страницы -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="34,30,34,34">
+                <StackPanel x:Name="PageAppearance"/>
+                <StackPanel x:Name="PageShape" Visibility="Collapsed"/>
+                <StackPanel x:Name="PageAnimation" Visibility="Collapsed"/>
+                <StackPanel x:Name="PageFeatures" Visibility="Collapsed"/>
+                <StackPanel x:Name="PageClipboard" Visibility="Collapsed"/>
+                <StackPanel x:Name="PageAbout" Visibility="Collapsed"/>
+
+                <!-- Обновление -->
+                <StackPanel x:Name="PageUpdate" Visibility="Collapsed">
+                    <TextBlock Text="Обновление" FontSize="26" FontWeight="SemiBold"/>
+                    <TextBlock Text="Перетащите файл обновления сюда — программа сама загрузит его на GitHub, дождётся сборки и установит новую версию."
+                               FontSize="13" Foreground="#98989D" TextWrapping="Wrap" Margin="0,6,0,18"/>
+
+                    <!-- Подключение -->
+                    <Border Background="#2A2A2D" CornerRadius="14" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="Подключение к GitHub" FontSize="15" FontWeight="SemiBold"/>
+                            <TextBlock Text="Адрес репозитория" FontSize="12" Foreground="#98989D" Margin="0,12,0,5"/>
+                            <TextBox x:Name="RepoBox" Style="{StaticResource DarkTextBox}"/>
+                            <TextBlock Text="Например: https://github.com/ваш-логин/название-репозитория"
+                                       FontSize="11" Foreground="#636366" Margin="0,4,0,0"/>
+                            <TextBlock Text="Токен доступа" FontSize="12" Foreground="#98989D" Margin="0,12,0,5"/>
+                            <PasswordBox x:Name="TokenBox" Style="{StaticResource DarkPasswordBox}"
+                                         PasswordChanged="TokenBox_PasswordChanged"/>
+                            <TextBlock Text="Хранится на этом компьютере в зашифрованном виде и никуда, кроме GitHub, не отправляется."
+                                       FontSize="11" Foreground="#636366" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                <Button x:Name="ConnectButton" Style="{StaticResource PrimaryPill}"
+                                        Content="Сохранить и проверить" Click="ConnectButton_Click"/>
+                                <Button Style="{StaticResource PillButton}" Content="Как получить токен"
+                                        Margin="10,0,0,0" Click="TokenHelpButton_Click"/>
+                            </StackPanel>
+                            <TextBlock x:Name="ConnectStatus" FontSize="12" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="TokenHelp" Visibility="Collapsed" FontSize="12" Foreground="#D1D1D6"
+                                       TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="19"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Зона перетаскивания -->
+                    <Grid x:Name="DropZone" Height="124" Margin="0,16,0,0" Background="Transparent" Cursor="Hand"
+                          MouseLeftButtonUp="DropZone_Click">
+                        <Rectangle x:Name="DropRect" Stroke="#636366" StrokeThickness="1.5"
+                                   StrokeDashArray="4 3" RadiusX="14" RadiusY="14"/>
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="Перетащите сюда ZIP-архив или файлы" FontSize="16" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Можно бросить в любое место окна. Или нажмите здесь, чтобы выбрать файлы."
+                                       FontSize="12" Foreground="#98989D" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock x:Name="FilesText" FontSize="12" Foreground="#D1D1D6" Margin="4,10,0,0"
+                               TextWrapping="Wrap" LineHeight="18"/>
+
+                    <!-- Кнопки -->
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <Button x:Name="UpdateButton" Style="{StaticResource PrimaryPill}" IsEnabled="False"
+                                Content="Обновить и установить" Click="UpdateButton_Click"/>
+                        <Button x:Name="InstallLatestButton" Style="{StaticResource PillButton}"
+                                Content="Установить последнюю готовую сборку" Margin="10,0,0,0"
+                                Click="InstallLatestButton_Click"/>
+                        <Button x:Name="CancelButton" Style="{StaticResource PillButton}" Content="Отмена"
+                                Margin="10,0,0,0" Visibility="Collapsed" Click="CancelButton_Click"/>
+                    </StackPanel>
+
+                    <!-- Состояние -->
+                    <TextBlock x:Name="StatusLabel" FontSize="13" FontWeight="SemiBold" Margin="2,16,0,6"
+                               TextWrapping="Wrap"/>
+                    <ProgressBar x:Name="BusyBar" Height="6" IsIndeterminate="True" Visibility="Collapsed"
+                                 Foreground="#0A84FF" Background="#3A3A3C" BorderThickness="0"/>
+                    <TextBox x:Name="LogBox" Style="{StaticResource DarkTextBox}" IsReadOnly="True"
+                             TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="170" Margin="0,10,0,0"
+                             FontFamily="Consolas" FontSize="12" VerticalContentAlignment="Top"/>
+                    <Button x:Name="CopyLogButton" Style="{StaticResource PillButton}" Content="Копировать журнал"
+                            HorizontalAlignment="Left" Margin="0,10,0,0" Padding="14,6" Click="CopyLogButton_Click"/>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
+</Window>
