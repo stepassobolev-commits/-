@@ -31,6 +31,8 @@
                 <StackPanel x:Name="PageAnimation" Visibility="Collapsed"/>
                 <StackPanel x:Name="PageFeatures" Visibility="Collapsed"/>
                 <StackPanel x:Name="PageClipboard" Visibility="Collapsed"/>
+                <StackPanel x:Name="PageLayout" Visibility="Collapsed"/>
+                <StackPanel x:Name="PageExtras" Visibility="Collapsed"/>
                 <StackPanel x:Name="PageAbout" Visibility="Collapsed"/>
 
                 <!-- Обновление -->

@@ -47,6 +47,8 @@ public partial class SettingsWindow : Window
             ["animation"] = PageAnimation,
             ["features"] = PageFeatures,
             ["clipboard"] = PageClipboard,
+            ["layout"] = PageLayout,
+            ["extras"] = PageExtras,
             ["update"] = PageUpdate,
             ["about"] = PageAbout
         };
@@ -68,6 +70,8 @@ public partial class SettingsWindow : Window
             ("animation", "Анимация"),
             ("features", "Функции"),
             ("clipboard", "Буфер обмена"),
+            ("layout", "Раскладка"),
+            ("extras", "Дополнения"),
             ("update", "Обновление"),
             ("about", "О программе")
         };
@@ -107,7 +111,7 @@ public partial class SettingsWindow : Window
     private void RebuildPages()
     {
         _loading = true;
-        foreach (var key in new[] { "appearance", "shape", "animation", "features", "clipboard", "about" })
+        foreach (var key in new[] { "appearance", "shape", "animation", "features", "clipboard", "layout", "extras", "about" })
             _pages[key].Children.Clear();
 
         BuildAppearance(PageAppearance);
@@ -115,6 +119,8 @@ public partial class SettingsWindow : Window
         BuildAnimation(PageAnimation);
         BuildFeatures(PageFeatures);
         BuildClipboard(PageClipboard);
+        BuildLayout(PageLayout);
+        BuildExtras(PageExtras);
         BuildAbout(PageAbout);
         _loading = false;
     }
@@ -136,6 +142,8 @@ public partial class SettingsWindow : Window
             () => S.AccentColor, v => S.AccentColor = v);
         AddSwitch(page, "Эквалайзер в капсуле", "Анимированные полоски, пока играет музыка",
             () => S.ShowEqualizer, v => S.ShowEqualizer = v);
+        AddSegmented(page, "Цвет эквалайзера", new[] { "Акцент", "Цвет обложки" },
+            () => S.EqFromArtwork ? 1 : 0, index => S.EqFromArtwork = index == 1);
     }
 
     private void BuildShape(Panel page)
@@ -240,6 +248,75 @@ public partial class SettingsWindow : Window
         {
             (Application.Current.MainWindow as MainWindow)?.ClearClipboardHistory();
         });
+    }
+
+    private void BuildLayout(Panel page)
+    {
+        AddTitle(page, "Раскладка", "Порядок блоков в раскрытом острове, сверху вниз. Отключённые блоки не показываются.");
+        var names = new Dictionary<string, string>
+        {
+            ["player"] = "Плеер",
+            ["volume"] = "Громкость",
+            ["clipboard"] = "Буфер обмена",
+            ["stats"] = "Нагрузка ПК"
+        };
+
+        var order = S.GetBlockOrder();
+        for (var i = 0; i < order.Length; i++)
+        {
+            var index = i;
+            var host = new StackPanel { Orientation = Orientation.Horizontal };
+            host.Children.Add(MakeSmallButton("▲", index > 0, () => MoveBlock(index, -1)));
+            host.Children.Add(MakeSmallButton("▼", index < order.Length - 1, () => MoveBlock(index, 1)));
+            page.Children.Add(MakeRow($"{index + 1}. {names[order[index]]}", null, host));
+        }
+
+        AddButton(page, "Порядок по умолчанию", null, "Сбросить", () =>
+        {
+            S.BlockOrder = "player,volume,clipboard,stats";
+            Commit();
+            Dispatcher.BeginInvoke(new Action(RebuildPages));
+        });
+    }
+
+    private void MoveBlock(int index, int delta)
+    {
+        var order = S.GetBlockOrder().ToList();
+        var target = index + delta;
+        if (target < 0 || target >= order.Count) return;
+
+        (order[index], order[target]) = (order[target], order[index]);
+        S.BlockOrder = string.Join(',', order);
+        Commit();
+        Dispatcher.BeginInvoke(new Action(RebuildPages));
+    }
+
+    private Button MakeSmallButton(string text, bool enabled, Action click)
+    {
+        var button = new Button
+        {
+            Style = (Style)FindResource("PillButton"),
+            Content = text,
+            Padding = new Thickness(12, 5, 12, 5),
+            Margin = new Thickness(4, 0, 0, 0),
+            IsEnabled = enabled
+        };
+        button.Click += (_, _) => click();
+        return button;
+    }
+
+    private void BuildExtras(Panel page)
+    {
+        AddTitle(page, "Дополнения", "Новые функции. Все выключены по умолчанию — включайте только то, что нужно.");
+        AddSwitch(page, "Нагрузка ПК", "Процессор и память в раскрытом острове",
+            () => S.ShowSystemStats, v => S.ShowSystemStats = v);
+        AddSwitch(page, "Название трека в капсуле", "Вместо часов, пока играет музыка",
+            () => S.ShowTrackTitle, v => S.ShowTrackTitle = v);
+        AddSwitch(page, "Название при смене трека", "Капсула на пару секунд расширяется и показывает название",
+            () => S.TrackChangePopup, v => S.TrackChangePopup = v);
+        AddSlider(page, "Ширина при названии", 60, 220, () => S.TitleExtraWidth, v => S.TitleExtraWidth = v, " px");
+        AddSwitch(page, "Скрывать в играх и видео на весь экран", "Остров не мешает и не забирает фокус",
+            () => S.HideInFullscreen, v => S.HideInFullscreen = v);
     }
 
     private void BuildAbout(Panel page)

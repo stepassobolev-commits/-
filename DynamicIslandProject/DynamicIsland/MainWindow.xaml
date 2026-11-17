@@ -5,6 +5,7 @@
         WindowStyle="None" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
         WindowStartupLocation="Manual" UseLayoutRounding="False" SnapsToDevicePixels="False"
+        ShowActivated="False" TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale"
         FontFamily="{StaticResource TextFont}">
     <Grid>
         <Grid.LayoutTransform>
@@ -27,7 +28,7 @@
 
             <Grid>
                 <!-- ===== Компактная капсула ===== -->
-                <Grid x:Name="CompactPanel" Margin="10,0">
+                <Grid x:Name="CompactPanel" Margin="10,0" UseLayoutRounding="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -38,27 +39,36 @@
                             Visibility="Collapsed">
                         <Image x:Name="CompactArt" Stretch="UniformToFill"/>
                     </Border>
-                    <TextBlock x:Name="ClockText" Grid.Column="1" Text="--:--" Foreground="#F2F2F7"
-                               FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <Grid Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="ClockText" Text="--:--" Foreground="#F2F2F7"
+                                   FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="CompactTitle" Foreground="#F2F2F7" FontSize="12" FontWeight="SemiBold"
+                                   MaxWidth="190" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"
+                                   Visibility="Collapsed"/>
+                    </Grid>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
                         <StackPanel x:Name="EqPanel" Orientation="Horizontal" VerticalAlignment="Center"
-                                    Visibility="Collapsed">
-                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
-                                       Margin="1,0" RenderTransformOrigin="0.5,1">
-                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale1" ScaleY="0.25"/></Rectangle.RenderTransform>
+                                    Visibility="Collapsed" Margin="0,0,2,0">
+                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                                       Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
+                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale1" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
-                                       Margin="1,0" RenderTransformOrigin="0.5,1">
-                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale2" ScaleY="0.25"/></Rectangle.RenderTransform>
+                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                                       Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
+                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale2" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
-                                       Margin="1,0" RenderTransformOrigin="0.5,1">
-                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale3" ScaleY="0.25"/></Rectangle.RenderTransform>
+                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                                       Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
+                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale3" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
-                                       Margin="1,0" RenderTransformOrigin="0.5,1">
-                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale4" ScaleY="0.25"/></Rectangle.RenderTransform>
+                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                                       Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
+                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale4" ScaleY="0.2"/></Rectangle.RenderTransform>
+                            </Rectangle>
+                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                                       Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
+                                <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale5" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
                         </StackPanel>
                         <Button x:Name="CompactPlayButton" Style="{StaticResource TransportButton}"
@@ -71,7 +81,7 @@
                 </Grid>
 
                 <!-- ===== Раскрытая панель ===== -->
-                <Grid x:Name="ExpandedPanel" Visibility="Collapsed" Opacity="0"
+                <Grid x:Name="ExpandedPanel" Visibility="Collapsed" Opacity="0" UseLayoutRounding="True"
                       Width="364" Height="520" Margin="0,22,0,0"
                       HorizontalAlignment="Center" VerticalAlignment="Top">
                     <Grid.RenderTransform>
@@ -82,7 +92,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Часы и дата -->
@@ -178,7 +188,12 @@
                     </Grid>
 
                     <!-- Буфер обмена: заголовок и настройки -->
-                    <StackPanel x:Name="ClipboardHeader" Grid.Row="3" Margin="6,18,6,8">
+                    <Grid x:Name="ClipboardBlock" Grid.Row="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel x:Name="ClipboardHeader" Grid.Row="0" Margin="6,18,6,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -216,7 +231,7 @@
                     </StackPanel>
 
                     <!-- Список записей -->
-                    <Border x:Name="ClipboardCard" Grid.Row="4" Background="#1C1C1E" CornerRadius="16" Padding="5">
+                    <Border x:Name="ClipboardCard" Grid.Row="1" Background="#1C1C1E" CornerRadius="16" Padding="5">
                         <Grid>
                             <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                                 <ItemsControl x:Name="ClipboardItems">
@@ -278,6 +293,42 @@
                                        VerticalAlignment="Center" IsHitTestVisible="False"/>
                         </Grid>
                     </Border>
+                    </Grid>
+
+                    <!-- Нагрузка ПК (дополнение) -->
+                    <Grid x:Name="StatsRow" Grid.Row="4" Margin="0,12,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Background="#1C1C1E" CornerRadius="14" Padding="12,9">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Процессор" Foreground="#98989D" FontSize="11"/>
+                                    <TextBlock x:Name="CpuText" Text="0%" Foreground="#F2F2F7" FontSize="12"
+                                               FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Border x:Name="CpuTrack" Height="4" CornerRadius="2" Background="#3A3A3C" Margin="0,7,0,0">
+                                    <Border x:Name="CpuFill" Width="0" HorizontalAlignment="Left" CornerRadius="2"
+                                            Background="#0A84FF"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <Border Grid.Column="2" Background="#1C1C1E" CornerRadius="14" Padding="12,9">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock Text="Память" Foreground="#98989D" FontSize="11"/>
+                                    <TextBlock x:Name="RamText" Text="0%" Foreground="#F2F2F7" FontSize="12"
+                                               FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <Border x:Name="RamTrack" Height="4" CornerRadius="2" Background="#3A3A3C" Margin="0,7,0,0">
+                                    <Border x:Name="RamFill" Width="0" HorizontalAlignment="Left" CornerRadius="2"
+                                            Background="#30D158"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </Grid>
             </Grid>
         </Border>

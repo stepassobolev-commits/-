@@ -29,6 +29,19 @@ public sealed class AppSettings
     public double MediaExtraWidth { get; set; } = 64;
     public bool SmoothMode { get; set; } = false;
 
+    // ---------- Музыка ----------
+    public bool EqFromArtwork { get; set; } = true;
+
+    // ---------- Дополнения (по умолчанию выключены) ----------
+    public bool ShowSystemStats { get; set; } = false;
+    public bool ShowTrackTitle { get; set; } = false;
+    public bool TrackChangePopup { get; set; } = false;
+    public bool HideInFullscreen { get; set; } = false;
+    public double TitleExtraWidth { get; set; } = 120;
+
+    // ---------- Раскладка ----------
+    public string BlockOrder { get; set; } = "player,volume,clipboard,stats";
+
     // ---------- Анимация ----------
     public bool AnimationsEnabled { get; set; } = true;
     public double AnimationStiffness { get; set; } = 380;
@@ -67,6 +80,22 @@ public sealed class AppSettings
     public static AppSettings Current { get; private set; } = Load();
 
     public static event Action? Changed;
+
+    /// <summary>Порядок блоков острова сверху вниз (всегда содержит все четыре блока).</summary>
+    public string[] GetBlockOrder()
+    {
+        var known = new[] { "player", "volume", "clipboard", "stats" };
+        var result = new List<string>();
+        foreach (var part in (BlockOrder ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (known.Contains(part) && !result.Contains(part)) result.Add(part);
+        }
+        foreach (var key in known)
+        {
+            if (!result.Contains(key)) result.Add(key);
+        }
+        return result.ToArray();
+    }
 
     public static string SettingsDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynamicIsland");

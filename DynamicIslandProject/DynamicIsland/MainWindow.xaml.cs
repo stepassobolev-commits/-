@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -69,6 +70,7 @@ public partial class MainWindow : Window
             if (s.ShowPlayer) height += 178;
             if (s.ShowVolume) height += 36;
             if (s.ShowClipboard) height += 260;
+            if (s.ShowSystemStats) height += 56;
             return height;
         }
     }
@@ -109,6 +111,58 @@ public partial class MainWindow : Window
     private IntPtr _hwnd;
     private bool _smoothReady;
 
+    // Музыка: спектр, цвет обложки, название в капсуле.
+    private AudioSpectrum? _spectrum;
+    private readonly float[] _spectrumBuffer = new float[AudioSpectrum.Bands];
+    private readonly double[] _barLevels = new double[AudioSpectrum.Bands];
+    private Color? _artColor;
+    private DateTime _titleUntil = DateTime.MinValue;
+    private double _tp;
+    private double _tv;
+    private double _tTarget;
+
+    // Дополнения.
+    private readonly DispatcherTimer _titleTimer = new() { Interval = TimeSpan.FromSeconds(3.6) };
+    private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromMilliseconds(1500) };
+    private readonly DispatcherTimer _fullscreenTimer = new() { Interval = TimeSpan.FromMilliseconds(1000) };
+    private bool _hiddenByFullscreen;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RectInt
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public RectInt Monitor;
+        public RectInt Work;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out RectInt rect);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder text, int count);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Margins
     {
@@ -128,7 +182,7 @@ public partial class MainWindow : Window
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
     private ScaleTransform[] _bars = Array.Empty<ScaleTransform>();
     private readonly Stopwatch _beatClock = Stopwatch.StartNew();
-    private readonly DispatcherTimer _beatTimer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    private readonly DispatcherTimer _beatTimer = new() { Interval = TimeSpan.FromMilliseconds(20) };
 
     private GlobalSystemMediaTransportControlsSessionManager? _mediaManager;
     private readonly MMDeviceEnumerator _enumerator = new();
@@ -139,7 +193,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         // Режим отрисовки выбирается до показа окна: «плавный» (через DWM) или «совместимый» (прозрачное окно).
         AllowsTransparency = !S.SmoothMode;
-        _bars = new[] { EqScale1, EqScale2, EqScale3, EqScale4 };
+        _bars = new[] { EqScale1, EqScale2, EqScale3, EqScale4, EqScale5 };
         ClipboardItems.ItemsSource = _history;
         _history.CollectionChanged += (_, _) => UpdateEmptyState();
         UpdateEmptyState();
@@ -151,6 +205,13 @@ public partial class MainWindow : Window
         _expandTimer.Tick += (_, _) => OnExpandTimer();
         _statusTimer.Tick += (_, _) => { _statusTimer.Stop(); StatusText.Text = ""; };
         _beatTimer.Tick += (_, _) => OnBeatTick();
+        _titleTimer.Tick += (_, _) =>
+        {
+            _titleTimer.Stop();
+            UpdateTitleDisplay();
+        };
+        _statsTimer.Tick += (_, _) => UpdateStats();
+        _fullscreenTimer.Tick += (_, _) => CheckFullscreen();
 
         Loaded += async (_, _) =>
         {
@@ -383,9 +444,11 @@ public partial class MainWindow : Window
         var damping = 2.0 * Math.Clamp(S.AnimationDamping, 0.3, 1.0) * Math.Sqrt(stiffness);
         Integrate(ref _p, ref _v, _target, stiffness, damping, dt);
         Integrate(ref _wp, ref _wv, _wTarget, stiffness, damping, dt);
+        Integrate(ref _tp, ref _tv, _tTarget, stiffness, damping, dt);
 
         var settledP = Math.Abs(_p - _target) < 0.0008 && Math.Abs(_v) < 0.01;
         var settledW = Math.Abs(_wp - _wTarget) < 0.0008 && Math.Abs(_wv) < 0.01;
+        var settledT = Math.Abs(_tp - _tTarget) < 0.0008 && Math.Abs(_tv) < 0.01;
         if (settledP)
         {
             _p = _target;
@@ -396,14 +459,32 @@ public partial class MainWindow : Window
             _wp = _wTarget;
             _wv = 0;
         }
+        if (settledT)
+        {
+            _tp = _tTarget;
+            _tv = 0;
+        }
 
         ApplyProgress();
 
-        if (settledP && settledW)
+        if (settledP && settledW && settledT)
         {
             StopRendering();
             OnMotionSettled();
         }
+    }
+
+    private void SetTitleWide(bool wide)
+    {
+        _tTarget = wide ? 1.0 : 0.0;
+        if (!S.AnimationsEnabled)
+        {
+            _tp = _tTarget;
+            _tv = 0;
+            ApplyProgress();
+            return;
+        }
+        EnsureRendering();
     }
 
     /// <summary>Тяжёлые операции (звуковое устройство, плеер) выполняем только когда движение закончилось.</summary>
@@ -412,6 +493,7 @@ public partial class MainWindow : Window
         if (!_expanded) return;
         RefreshVolume();
         _ = RefreshMediaAsync();
+        UpdateStats();
     }
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
@@ -423,7 +505,8 @@ public partial class MainWindow : Window
         var g = Math.Max(0.0, p);
 
         var s = S;
-        var compactNow = s.CompactWidth + s.MediaExtraWidth * Math.Clamp(_wp, 0.0, 1.15);
+        var compactNow = s.CompactWidth + s.MediaExtraWidth * Math.Clamp(_wp, 0.0, 1.15)
+                         + s.TitleExtraWidth * Math.Clamp(_tp, 0.0, 1.1);
         var width = Lerp(compactNow, ExpandedW, g);
         var height = Lerp(s.CompactHeight, ExpandedH, g);
         RootBorder.Width = width;
@@ -502,7 +585,7 @@ public partial class MainWindow : Window
         var accent = new SolidColorBrush(s.AccentColorValue);
         StatusText.Foreground = accent;
         ProgressFill.Background = accent;
-        foreach (var bar in EqPanel.Children.OfType<System.Windows.Shapes.Rectangle>()) bar.Fill = accent;
+        ApplyEqColor();
         EqPanel.Visibility = _mediaActive && s.ShowEqualizer ? Visibility.Visible : Visibility.Collapsed;
 
         RootBorder.Margin = new Thickness(0, s.TopOffset, 0, 0);
@@ -513,8 +596,28 @@ public partial class MainWindow : Window
 
         PlayerCard.Visibility = s.ShowPlayer ? Visibility.Visible : Visibility.Collapsed;
         VolumeRow.Visibility = s.ShowVolume ? Visibility.Visible : Visibility.Collapsed;
-        ClipboardHeader.Visibility = s.ShowClipboard ? Visibility.Visible : Visibility.Collapsed;
-        ClipboardCard.Visibility = s.ShowClipboard ? Visibility.Visible : Visibility.Collapsed;
+        ClipboardBlock.Visibility = s.ShowClipboard ? Visibility.Visible : Visibility.Collapsed;
+        StatsRow.Visibility = s.ShowSystemStats ? Visibility.Visible : Visibility.Collapsed;
+        ApplyBlockOrder();
+
+        if (s.ShowSystemStats) { if (!_statsTimer.IsEnabled) _statsTimer.Start(); }
+        else _statsTimer.Stop();
+
+        if (s.HideInFullscreen)
+        {
+            if (!_fullscreenTimer.IsEnabled) _fullscreenTimer.Start();
+        }
+        else
+        {
+            _fullscreenTimer.Stop();
+            if (_hiddenByFullscreen)
+            {
+                _hiddenByFullscreen = false;
+                Show();
+            }
+        }
+
+        UpdateTitleDisplay();
         ExpandedPanel.Height = ExpandedH - 40.0;
 
         _expandTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, s.ExpandDelayMs));
@@ -524,9 +627,100 @@ public partial class MainWindow : Window
         ApplyProgress();
     }
 
+    /// <summary>Порядок блоков внутри раскрытого острова (настраивается в приложении).</summary>
+    private void ApplyBlockOrder()
+    {
+        var order = S.GetBlockOrder();
+        for (var i = 0; i < order.Length; i++)
+        {
+            FrameworkElement element = order[i] switch
+            {
+                "player" => PlayerCard,
+                "volume" => VolumeRow,
+                "clipboard" => ClipboardBlock,
+                _ => StatsRow
+            };
+            Grid.SetRow(element, i + 1);
+            ExpandedPanel.RowDefinitions[i + 1].Height =
+                element == ClipboardBlock ? new GridLength(1, GridUnitType.Star) : GridLength.Auto;
+        }
+    }
+
+    private void ApplyEqColor()
+    {
+        var s = S;
+        var color = s.EqFromArtwork && _artColor is { } art ? art : s.AccentColorValue;
+        var brush = new SolidColorBrush(color);
+        foreach (var bar in EqPanel.Children.OfType<System.Windows.Shapes.Rectangle>()) bar.Fill = brush;
+    }
+
+    private void UpdateTitleDisplay()
+    {
+        var show = _mediaActive && (S.ShowTrackTitle || DateTime.UtcNow < _titleUntil);
+        CompactTitle.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        ClockText.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        SetTitleWide(show);
+    }
+
+    private void UpdateStats()
+    {
+        if (!_expanded || !S.ShowSystemStats) return;
+        var cpu = SystemStats.CpuPercent();
+        var ram = SystemStats.MemoryPercent();
+        CpuText.Text = $"{cpu:0}%";
+        RamText.Text = $"{ram:0}%";
+        CpuFill.Width = CpuTrack.ActualWidth * cpu / 100.0;
+        RamFill.Width = RamTrack.ActualWidth * ram / 100.0;
+    }
+
+    // ---------- Полноэкранные игры и видео ----------
+
+    private void CheckFullscreen()
+    {
+        var hide = S.HideInFullscreen && IsForegroundFullscreen();
+        if (hide == _hiddenByFullscreen) return;
+        _hiddenByFullscreen = hide;
+        if (hide) Hide();
+        else Show();
+    }
+
+    private bool IsForegroundFullscreen()
+    {
+        try
+        {
+            var foreground = GetForegroundWindow();
+            if (foreground == IntPtr.Zero) return false;
+
+            GetWindowThreadProcessId(foreground, out var processId);
+            if (processId == (uint)Environment.ProcessId) return false;
+
+            var className = new StringBuilder(64);
+            GetClassName(foreground, className, className.Capacity);
+            if (className.ToString() is "Progman" or "WorkerW" or "Shell_TrayWnd") return false;
+
+            if (!GetWindowRect(foreground, out var rect)) return false;
+            var monitor = MonitorFromWindow(foreground, 2);
+            var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            if (!GetMonitorInfo(monitor, ref info)) return false;
+
+            return rect.Left <= info.Monitor.Left && rect.Top <= info.Monitor.Top &&
+                   rect.Right >= info.Monitor.Right && rect.Bottom >= info.Monitor.Bottom;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Кэш в виде картинки: панель не перерисовывается на каждом кадре анимации.</summary>
     private void UpdateCacheScale(double uiScale)
     {
+        // В плавном режиме кэш не нужен: он делал картинку мутной.
+        if (S.SmoothMode)
+        {
+            ExpandedPanel.CacheMode = null;
+            CompactPanel.CacheMode = null;
+            _cacheScale = 0;
+            return;
+        }
+
         var dpi = 1.0;
         try { dpi = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
         var scale = Math.Max(0.5, uiScale * dpi);
@@ -732,36 +926,96 @@ public partial class MainWindow : Window
             SetMediaWide(active);
         }
 
-        if (playing)
+        if (playing && S.ShowEqualizer)
         {
+            _spectrum ??= new AudioSpectrum();
+            if (!_spectrum.IsRunning) _spectrum.Start();
             if (!_beatTimer.IsEnabled) _beatTimer.Start();
         }
         else
         {
             _beatTimer.Stop();
-            _level = 0;
-            foreach (var bar in _bars) bar.ScaleY = 0.25;
+            _spectrum?.Stop();
+            Array.Clear(_barLevels);
+            foreach (var bar in _bars) bar.ScaleY = 0.2;
         }
+
+        UpdateTitleDisplay();
     }
 
-    /// <summary>Полоски двигаются в такт реальной громкости звука, который воспроизводит Windows.</summary>
+    /// <summary>Полоски двигаются по спектру реального звука: бас слева, верха справа.</summary>
     private void OnBeatTick()
     {
         if (!_playing || _bars.Length == 0 || CompactPanel.Visibility != Visibility.Visible) return;
 
-        var peak = 0.0;
-        try { peak = _audioDevice?.AudioMeterInformation.MasterPeakValue ?? 0.0; }
-        catch { _audioDevice = null; }
+        var spectrumOn = _spectrum is { IsRunning: true };
+        var live = spectrumOn && Environment.TickCount64 - _spectrum!.LastDataTick < 150;
+        if (spectrumOn) _spectrum!.GetLevels(_spectrumBuffer);
 
-        var target = Math.Sqrt(Math.Clamp(peak, 0.0, 1.0));
-        _level = target > _level ? target : _level * 0.84 + target * 0.16;
+        var fallback = 0.0;
+        if (!spectrumOn)
+        {
+            try { fallback = Math.Sqrt(Math.Clamp(_audioDevice?.AudioMeterInformation.MasterPeakValue ?? 0.0, 0.0, 1.0)); }
+            catch { _audioDevice = null; }
+        }
 
         var t = _beatClock.Elapsed.TotalSeconds;
         for (var i = 0; i < _bars.Length; i++)
         {
-            var wobble = 0.65 + 0.35 * Math.Sin(t * (6.0 + i * 1.7) + i * 1.3);
-            _bars[i].ScaleY = 0.22 + 0.78 * Math.Clamp(_level * 1.7 * wobble, 0.0, 1.0);
+            double target;
+            if (spectrumOn)
+                target = live ? _spectrumBuffer[i] : 0.0;
+            else
+                target = Math.Clamp(fallback * (0.65 + 0.35 * Math.Sin(t * (6.0 + i * 1.7) + i * 1.3)) * 1.6, 0.0, 1.0);
+
+            var current = _barLevels[i];
+            current += (target - current) * (target > current ? 0.55 : 0.16);
+            _barLevels[i] = current;
+            _bars[i].ScaleY = 0.2 + 0.8 * current;
         }
+    }
+
+    /// <summary>Основной цвет обложки: яркий и насыщенный, чтобы хорошо читался на чёрном.</summary>
+    private static Color? DominantColor(BitmapSource? source)
+    {
+        if (source is null) return null;
+        try
+        {
+            var converted = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+            var width = converted.PixelWidth;
+            var height = converted.PixelHeight;
+            var stride = width * 4;
+            var pixels = new byte[stride * height];
+            converted.CopyPixels(pixels, stride, 0);
+
+            double red = 0, green = 0, blue = 0, total = 0;
+            for (var i = 0; i + 3 < pixels.Length; i += 16)
+            {
+                double b = pixels[i], g = pixels[i + 1], r = pixels[i + 2];
+                var max = Math.Max(r, Math.Max(g, b));
+                var min = Math.Min(r, Math.Min(g, b));
+                if (max < 40) continue;
+                var saturation = (max - min) / max;
+                var weight = saturation * saturation + 0.02;
+                red += r * weight;
+                green += g * weight;
+                blue += b * weight;
+                total += weight;
+            }
+            if (total <= 0) return null;
+
+            red /= total;
+            green /= total;
+            blue /= total;
+            var brightest = Math.Max(red, Math.Max(green, blue));
+            if (brightest < 1) return null;
+            var scale = 235.0 / brightest;
+            return Color.FromRgb(
+                (byte)Math.Min(255, red * scale),
+                (byte)Math.Min(255, green * scale),
+                (byte)Math.Min(255, blue * scale));
+        }
+        catch { return null; }
     }
 
     private void SetNoMedia()
@@ -778,6 +1032,8 @@ public partial class MainWindow : Window
             _trackKey = "";
             ArtImage.Source = null;
             CompactArt.Source = null;
+            _artColor = null;
+            ApplyEqColor();
         }
     }
 
@@ -799,6 +1055,7 @@ public partial class MainWindow : Window
             var artist = string.IsNullOrWhiteSpace(info.Artist) ? session.SourceAppUserModelId : info.Artist;
             TrackTitle.Text = title;
             TrackArtist.Text = artist;
+            CompactTitle.Text = title;
 
             var key = $"{title}|{artist}";
             if (key != _trackKey)
@@ -807,7 +1064,15 @@ public partial class MainWindow : Window
                 var art = await LoadArtAsync(info);
                 ArtImage.Source = art;
                 CompactArt.Source = art;
-                CompactArtBox.Visibility = art is null ? Visibility.Collapsed : Visibility.Visible;
+                _artColor = DominantColor(art);
+                ApplyEqColor();
+
+                if (S.TrackChangePopup)
+                {
+                    _titleUntil = DateTime.UtcNow.AddSeconds(3.5);
+                    _titleTimer.Stop();
+                    _titleTimer.Start();
+                }
             }
 
             var status = session.GetPlaybackInfo().PlaybackStatus;
@@ -965,6 +1230,10 @@ public partial class MainWindow : Window
         _expandTimer.Stop();
         _statusTimer.Stop();
         _beatTimer.Stop();
+        _titleTimer.Stop();
+        _statsTimer.Stop();
+        _fullscreenTimer.Stop();
+        _spectrum?.Dispose();
         _audioDevice?.Dispose();
         _enumerator.Dispose();
         base.OnClosed(e);
