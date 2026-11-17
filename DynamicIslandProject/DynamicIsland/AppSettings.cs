@@ -19,15 +19,16 @@ public sealed class AppSettings
     public string AccentColor { get; set; } = "#0A84FF";
 
     // ---------- Форма и положение ----------
-    public double CompactWidth { get; set; } = 200;
-    public double CompactHeight { get; set; } = 34;
-    public double CompactRadius { get; set; } = 17;
-    public double ExpandedRadius { get; set; } = 32;
+    public double CompactWidth { get; set; } = 170;
+    public double CompactHeight { get; set; } = 29;
+    public double CompactRadius { get; set; } = 14.5;
+    public double ExpandedRadius { get; set; } = 27;
     public bool FlatTop { get; set; } = false;
-    public double TopOffset { get; set; } = 8;
-    public double UiScale { get; set; } = 0.85;
-    public double MediaExtraWidth { get; set; } = 64;
+    public double TopOffset { get; set; } = 7;
+    public double UiScale { get; set; } = 1.0;
+    public double MediaExtraWidth { get; set; } = 54;
     public bool SmoothMode { get; set; } = false;
+    public int SettingsVersion { get; set; } = 0;
 
     // ---------- Музыка ----------
     public bool EqFromArtwork { get; set; } = true;
@@ -37,7 +38,7 @@ public sealed class AppSettings
     public bool ShowTrackTitle { get; set; } = false;
     public bool TrackChangePopup { get; set; } = false;
     public bool HideInFullscreen { get; set; } = false;
-    public double TitleExtraWidth { get; set; } = 120;
+    public double TitleExtraWidth { get; set; } = 102;
 
     // ---------- Раскладка ----------
     public string BlockOrder { get; set; } = "player,volume,clipboard,stats";
@@ -109,11 +110,34 @@ public sealed class AppSettings
             if (File.Exists(SettingsPath))
             {
                 var loaded = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
-                if (loaded is not null) return loaded;
+                if (loaded is not null)
+                {
+                    loaded.Migrate();
+                    return loaded;
+                }
             }
         }
         catch { /* Повреждённый файл — начинаем с настроек по умолчанию. */ }
-        return new AppSettings();
+
+        var fresh = new AppSettings();
+        fresh.Migrate();
+        return fresh;
+    }
+
+    /// <summary>Версия 0.9: размеры записаны прямо в разметку, поэтому масштаб интерфейса сбрасывается на 100%.</summary>
+    private void Migrate()
+    {
+        if (SettingsVersion >= 9) return;
+
+        UiScale = 1.0;
+        CompactWidth = 170;
+        CompactHeight = 29;
+        CompactRadius = 14.5;
+        ExpandedRadius = 27;
+        TopOffset = 7;
+        MediaExtraWidth = 54;
+        TitleExtraWidth = 102;
+        SettingsVersion = 9;
     }
 
     /// <summary>Сообщить окнам, что настройки изменились, и сохранить их на диск (с небольшой задержкой).</summary>

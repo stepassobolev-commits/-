@@ -4,16 +4,16 @@
         Title="Dynamic Island" Width="480" Height="660"
         WindowStyle="None" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize"
-        WindowStartupLocation="Manual" UseLayoutRounding="False" SnapsToDevicePixels="False"
-        ShowActivated="False" TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="Grayscale"
+        WindowStartupLocation="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        ShowActivated="False" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale"
         FontFamily="{StaticResource TextFont}">
     <Grid>
         <Grid.LayoutTransform>
-            <ScaleTransform x:Name="IslandScale" ScaleX="0.85" ScaleY="0.85"/>
+            <ScaleTransform x:Name="IslandScale" ScaleX="1" ScaleY="1"/>
         </Grid.LayoutTransform>
-        <Border x:Name="RootBorder" Width="200" Height="34" Margin="0,8,0,0"
+        <Border x:Name="RootBorder" UseLayoutRounding="False" Width="170" Height="29" Margin="0,7,0,0"
                 HorizontalAlignment="Center" VerticalAlignment="Top"
-                CornerRadius="17" BorderThickness="1" BorderBrush="#26FFFFFF"
+                CornerRadius="14" BorderThickness="1" BorderBrush="#26FFFFFF"
                 Background="#FF050507" ClipToBounds="True"
                 MouseEnter="Root_MouseEnter" MouseLeave="Root_MouseLeave"
                 MouseLeftButtonUp="Root_MouseLeftButtonUp">
@@ -28,61 +28,61 @@
 
             <Grid>
                 <!-- ===== Компактная капсула ===== -->
-                <Grid x:Name="CompactPanel" Margin="10,0" UseLayoutRounding="True">
+                <Grid x:Name="CompactPanel" Margin="8,0" UseLayoutRounding="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border x:Name="CompactArtBox" Width="22" Height="22" CornerRadius="6" Background="#2C2C2E"
+                    <Border x:Name="CompactArtBox" Width="19" Height="19" CornerRadius="5" Background="#2C2C2E"
                             HorizontalAlignment="Left" VerticalAlignment="Center" ClipToBounds="True"
                             Visibility="Collapsed">
                         <Image x:Name="CompactArt" Stretch="UniformToFill"/>
                     </Border>
                     <Grid Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock x:Name="ClockText" Text="--:--" Foreground="#F2F2F7"
-                                   FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                        <TextBlock x:Name="CompactTitle" Foreground="#F2F2F7" FontSize="12" FontWeight="SemiBold"
-                                   MaxWidth="190" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"
+                                   FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="CompactTitle" Foreground="#F2F2F7" FontSize="10" FontWeight="SemiBold"
+                                   MaxWidth="162" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center"
                                    Visibility="Collapsed"/>
                     </Grid>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"
                                 VerticalAlignment="Center">
                         <StackPanel x:Name="EqPanel" Orientation="Horizontal" VerticalAlignment="Center"
                                     Visibility="Collapsed" Margin="0,0,2,0">
-                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
                                        Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
                                 <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale1" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
                                        Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
                                 <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale2" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
                                        Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
                                 <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale3" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
                                        Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
                                 <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale4" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
-                            <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
+                            <Rectangle Width="3" Height="14" RadiusX="1.5" RadiusY="1.5" Fill="#30D158"
                                        Margin="1.2,0" RenderTransformOrigin="0.5,0.5">
                                 <Rectangle.RenderTransform><ScaleTransform x:Name="EqScale5" ScaleY="0.2"/></Rectangle.RenderTransform>
                             </Rectangle>
                         </StackPanel>
                         <Button x:Name="CompactPlayButton" Style="{StaticResource TransportButton}"
-                                Width="26" Height="24" Margin="4,0,0,0" Visibility="Collapsed"
+                                Width="22" Height="20" Margin="4,0,0,0" Visibility="Collapsed"
                                 Click="PlayPause_Click" ToolTip="Пауза / воспроизведение">
                             <Path x:Name="CompactPlayIcon" Data="{StaticResource PauseGeo}"
-                                  Style="{StaticResource TransportIcon}" Height="11" StrokeThickness="1"/>
+                                  Style="{StaticResource TransportIcon}" Height="9" StrokeThickness="1"/>
                         </Button>
                     </StackPanel>
                 </Grid>
 
                 <!-- ===== Раскрытая панель ===== -->
                 <Grid x:Name="ExpandedPanel" Visibility="Collapsed" Opacity="0" UseLayoutRounding="True"
-                      Width="364" Height="520" Margin="0,22,0,0"
+                      Width="308" Height="442" Margin="0,19,0,0"
                       HorizontalAlignment="Center" VerticalAlignment="Top">
                     <Grid.RenderTransform>
                         <TranslateTransform x:Name="PanelShift" Y="-14"/>
@@ -96,23 +96,23 @@
                     </Grid.RowDefinitions>
 
                     <!-- Часы и дата -->
-                    <Grid Grid.Row="0" Margin="6,0,6,0">
+                    <Grid Grid.Row="0" Margin="5,0,5,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ClockBig" Text="--:--" Foreground="White" FontSize="34"
+                        <TextBlock x:Name="ClockBig" Text="--:--" Foreground="White" FontSize="29"
                                    FontWeight="Light" FontFamily="{StaticResource DisplayFont}"/>
-                        <TextBlock x:Name="DateText" Grid.Column="1" Text=" " Foreground="#98989D" FontSize="12"
-                                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,8,9"/>
+                        <TextBlock x:Name="DateText" Grid.Column="1" Text=" " Foreground="#98989D" FontSize="10"
+                                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,7,8"/>
                         <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE713;"
-                                Width="32" Height="30" FontSize="15" Foreground="#98989D"
+                                Width="27" Height="26" FontSize="13" Foreground="#98989D"
                                 VerticalAlignment="Center" Click="OpenSettings_Click" ToolTip="Настройки"/>
                     </Grid>
 
                     <!-- Проигрыватель -->
-                    <Border x:Name="PlayerCard" Grid.Row="1" Margin="0,12,0,0" Padding="14" CornerRadius="20" Background="#1C1C1E">
+                    <Border x:Name="PlayerCard" Grid.Row="1" Margin="0,10,0,0" Padding="12" CornerRadius="17" Background="#1C1C1E">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -125,23 +125,23 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Border Width="56" Height="56" CornerRadius="12" Background="#2C2C2E" ClipToBounds="True">
+                                <Border Width="48" Height="48" CornerRadius="10" Background="#2C2C2E" ClipToBounds="True">
                                     <Grid>
-                                        <TextBlock Text="♪" Foreground="#636366" FontSize="26"
+                                        <TextBlock Text="♪" Foreground="#636366" FontSize="22"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         <Image x:Name="ArtImage" Stretch="UniformToFill"/>
                                     </Grid>
                                 </Border>
-                                <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                                     <TextBlock x:Name="TrackTitle" Text="Ничего не играет" Foreground="#F2F2F7"
-                                               FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                               FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                     <TextBlock x:Name="TrackArtist" Text="Откройте плеер"
-                                               Foreground="#98989D" FontSize="12" Margin="0,2,0,0"
+                                               Foreground="#98989D" FontSize="10" Margin="0,2,0,0"
                                                TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Grid.Row="1" Margin="0,14,0,0">
+                            <Grid Grid.Row="1" Margin="0,12,0,0">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -150,20 +150,20 @@
                                     <Border x:Name="ProgressFill" Width="0" HorizontalAlignment="Left"
                                             CornerRadius="2" Background="#F2F2F7"/>
                                 </Border>
-                                <Grid Grid.Row="1" Margin="0,5,0,0">
-                                    <TextBlock x:Name="ElapsedText" Text="0:00" Foreground="#98989D" FontSize="10"/>
-                                    <TextBlock x:Name="RemainingText" Text="" Foreground="#98989D" FontSize="10"
+                                <Grid Grid.Row="1" Margin="0,4,0,0">
+                                    <TextBlock x:Name="ElapsedText" Text="0:00" Foreground="#98989D" FontSize="8.5"/>
+                                    <TextBlock x:Name="RemainingText" Text="" Foreground="#98989D" FontSize="8.5"
                                                HorizontalAlignment="Right"/>
                                 </Grid>
                             </Grid>
 
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,6,0,0">
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,5,0,0">
                                 <Button Style="{StaticResource TransportButton}" Click="Previous_Click" ToolTip="Назад">
                                     <Path Data="{StaticResource PrevGeo}" Style="{StaticResource TransportIcon}"/>
                                 </Button>
-                                <Button Style="{StaticResource TransportButton}" Width="64" Margin="6,0" Click="PlayPause_Click">
+                                <Button Style="{StaticResource TransportButton}" Width="54" Margin="5,0" Click="PlayPause_Click">
                                     <Path x:Name="PlayIcon" Data="{StaticResource PlayGeo}"
-                                          Style="{StaticResource TransportIcon}" Height="24"/>
+                                          Style="{StaticResource TransportIcon}" Height="20"/>
                                 </Button>
                                 <Button Style="{StaticResource TransportButton}" Click="Next_Click" ToolTip="Далее">
                                     <Path Data="{StaticResource NextGeo}" Style="{StaticResource TransportIcon}"/>
@@ -173,18 +173,18 @@
                     </Border>
 
                     <!-- Громкость -->
-                    <Grid x:Name="VolumeRow" Grid.Row="2" Margin="8,14,8,0">
+                    <Grid x:Name="VolumeRow" Grid.Row="2" Margin="7,12,7,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="&#xE992;" FontFamily="{StaticResource IconFont}" Foreground="#98989D"
-                                   FontSize="14" VerticalAlignment="Center"/>
+                                   FontSize="12" VerticalAlignment="Center"/>
                         <Slider x:Name="VolumeSlider" Grid.Column="1" Style="{StaticResource MacSlider}"
-                                Margin="12,0" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
+                                Margin="10,0" VerticalAlignment="Center" ValueChanged="VolumeSlider_ValueChanged"/>
                         <TextBlock Grid.Column="2" Text="&#xE995;" FontFamily="{StaticResource IconFont}"
-                                   Foreground="#98989D" FontSize="14" VerticalAlignment="Center"/>
+                                   Foreground="#98989D" FontSize="12" VerticalAlignment="Center"/>
                     </Grid>
 
                     <!-- Буфер обмена: заголовок и настройки -->
@@ -193,27 +193,27 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <StackPanel x:Name="ClipboardHeader" Grid.Row="0" Margin="6,18,6,8">
+                    <StackPanel x:Name="ClipboardHeader" Grid.Row="0" Margin="5,15,5,7">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Буфер обмена" Foreground="#F2F2F7" FontSize="13" FontWeight="SemiBold"/>
-                                <TextBlock x:Name="StatusText" Foreground="#0A84FF" FontSize="11" Margin="10,1,0,0"
+                                <TextBlock Text="Буфер обмена" Foreground="#F2F2F7" FontSize="11" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="StatusText" Foreground="#0A84FF" FontSize="9.5" Margin="8,1,0,0"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
                             <ToggleButton x:Name="RecordSwitch" Grid.Column="1" Style="{StaticResource MacSwitch}"
                                           IsChecked="True" Click="Record_Click"
                                           ToolTip="Запись буфера обмена вкл/выкл"/>
                         </Grid>
-                        <Grid Margin="0,8,0,0">
+                        <Grid Margin="0,7,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Border Background="#2C2C2E" CornerRadius="8" Padding="2" HorizontalAlignment="Left"
+                            <Border Background="#2C2C2E" CornerRadius="7" Padding="2" HorizontalAlignment="Left"
                                     ToolTip="Сколько записей хранить">
                                 <StackPanel x:Name="LimitPanel" Orientation="Horizontal">
                                     <RadioButton GroupName="Limit" Content="5" Tag="5" IsChecked="True"
@@ -231,14 +231,14 @@
                     </StackPanel>
 
                     <!-- Список записей -->
-                    <Border x:Name="ClipboardCard" Grid.Row="1" Background="#1C1C1E" CornerRadius="16" Padding="5">
+                    <Border x:Name="ClipboardCard" Grid.Row="1" Background="#1C1C1E" CornerRadius="14" Padding="4">
                         <Grid>
                             <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
                                 <ItemsControl x:Name="ClipboardItems">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border x:Name="Row" Background="Transparent" CornerRadius="10"
-                                                    Margin="0,1" Padding="10,7,6,7" Cursor="Hand"
+                                            <Border x:Name="Row" Background="Transparent" CornerRadius="8"
+                                                    Margin="0,1" Padding="8,6,5,6" Cursor="Hand"
                                                     MouseLeftButtonUp="ClipboardItem_Click"
                                                     ToolTip="Нажмите, чтобы скопировать снова">
                                                 <Grid>
@@ -247,11 +247,11 @@
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel>
-                                                        <TextBlock Text="{Binding Preview}" Foreground="#F2F2F7" FontSize="12"
-                                                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="36"/>
+                                                        <TextBlock Text="{Binding Preview}" Foreground="#F2F2F7" FontSize="10"
+                                                                   TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxHeight="31"/>
                                                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                                             <TextBlock Text="&#xE718;" FontFamily="{StaticResource IconFont}"
-                                                                       Foreground="#98989D" FontSize="9" Margin="0,1,4,0">
+                                                                       Foreground="#98989D" FontSize="7.5" Margin="0,1,4,0">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Visibility" Value="Collapsed"/>
@@ -263,17 +263,17 @@
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
-                                                            <TextBlock Text="{Binding TimeText}" Foreground="#98989D" FontSize="10"/>
+                                                            <TextBlock Text="{Binding TimeText}" Foreground="#98989D" FontSize="8.5"/>
                                                         </StackPanel>
                                                     </StackPanel>
                                                     <StackPanel x:Name="Actions" Grid.Column="1" Orientation="Horizontal"
-                                                                Opacity="0" VerticalAlignment="Center" Margin="6,0,0,0">
+                                                                Opacity="0" VerticalAlignment="Center" Margin="5,0,0,0">
                                                         <Button Style="{StaticResource IconButton}" Content="&#xE718;"
-                                                                Width="30" Height="28" FontSize="13"
+                                                                Width="26" Height="24" FontSize="11"
                                                                 Opacity="{Binding PinOpacity}" Click="Pin_Click"
                                                                 ToolTip="Закрепить / открепить"/>
                                                         <Button Style="{StaticResource IconButton}" Content="&#xE74D;"
-                                                                Width="30" Height="28" FontSize="13"
+                                                                Width="26" Height="24" FontSize="11"
                                                                 Foreground="#98989D" Click="Delete_Click" ToolTip="Удалить"/>
                                                     </StackPanel>
                                                 </Grid>
@@ -289,40 +289,40 @@
                                 </ItemsControl>
                             </ScrollViewer>
                             <TextBlock x:Name="EmptyText" Text="Скопируйте текст — он появится здесь"
-                                       Foreground="#636366" FontSize="12" HorizontalAlignment="Center"
+                                       Foreground="#636366" FontSize="10" HorizontalAlignment="Center"
                                        VerticalAlignment="Center" IsHitTestVisible="False"/>
                         </Grid>
                     </Border>
                     </Grid>
 
                     <!-- Нагрузка ПК (дополнение) -->
-                    <Grid x:Name="StatsRow" Grid.Row="4" Margin="0,12,0,0" Visibility="Collapsed">
+                    <Grid x:Name="StatsRow" Grid.Row="4" Margin="0,10,0,0" Visibility="Collapsed">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="8"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Border Background="#1C1C1E" CornerRadius="14" Padding="12,9">
+                        <Border Background="#1C1C1E" CornerRadius="12" Padding="10,8">
                             <StackPanel>
                                 <Grid>
-                                    <TextBlock Text="Процессор" Foreground="#98989D" FontSize="11"/>
-                                    <TextBlock x:Name="CpuText" Text="0%" Foreground="#F2F2F7" FontSize="12"
-                                               FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                    <TextBlock Text="Процессор" Foreground="#98989D" FontSize="9.5"/>
+                                    <TextBlock x:Name="CpuText" Text="0%" Foreground="#F2F2F7" FontSize="10" Width="31"
+                                               TextAlignment="Right" FontWeight="SemiBold" HorizontalAlignment="Right"/>
                                 </Grid>
-                                <Border x:Name="CpuTrack" Height="4" CornerRadius="2" Background="#3A3A3C" Margin="0,7,0,0">
+                                <Border x:Name="CpuTrack" Height="4" CornerRadius="2" Background="#3A3A3C" Margin="0,6,0,0">
                                     <Border x:Name="CpuFill" Width="0" HorizontalAlignment="Left" CornerRadius="2"
                                             Background="#0A84FF"/>
                                 </Border>
                             </StackPanel>
                         </Border>
-                        <Border Grid.Column="2" Background="#1C1C1E" CornerRadius="14" Padding="12,9">
+                        <Border Grid.Column="2" Background="#1C1C1E" CornerRadius="12" Padding="10,8">
                             <StackPanel>
                                 <Grid>
-                                    <TextBlock Text="Память" Foreground="#98989D" FontSize="11"/>
-                                    <TextBlock x:Name="RamText" Text="0%" Foreground="#F2F2F7" FontSize="12"
-                                               FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                    <TextBlock Text="Память" Foreground="#98989D" FontSize="9.5"/>
+                                    <TextBlock x:Name="RamText" Text="0%" Foreground="#F2F2F7" FontSize="10" Width="31"
+                                               TextAlignment="Right" FontWeight="SemiBold" HorizontalAlignment="Right"/>
                                 </Grid>
-                                <Border x:Name="RamTrack" Height="4" CornerRadius="2" Background="#3A3A3C" Margin="0,7,0,0">
+                                <Border x:Name="RamTrack" Height="4" CornerRadius="2" Background="#3A3A3C" Margin="0,6,0,0">
                                     <Border x:Name="RamFill" Width="0" HorizontalAlignment="Left" CornerRadius="2"
                                             Background="#30D158"/>
                                 </Border>

@@ -57,7 +57,7 @@ public sealed class ClipboardEntry : INotifyPropertyChanged
 public partial class MainWindow : Window
 {
     // Окно всегда одного размера — это убирает лаги. Размеры капсулы и панели берутся из настроек.
-    private const double ExpandedW = 400;
+    private const double ExpandedW = 340;
 
     private static AppSettings S => AppSettings.Current;
 
@@ -66,11 +66,11 @@ public partial class MainWindow : Window
         get
         {
             var s = S;
-            var height = 22.0 + 46.0 + 18.0;
-            if (s.ShowPlayer) height += 178;
-            if (s.ShowVolume) height += 36;
-            if (s.ShowClipboard) height += 260;
-            if (s.ShowSystemStats) height += 56;
+            var height = 19.0 + 39.0 + 15.0;
+            if (s.ShowPlayer) height += 151;
+            if (s.ShowVolume) height += 31;
+            if (s.ShowClipboard) height += 221;
+            if (s.ShowSystemStats) height += 48;
             return height;
         }
     }
@@ -123,7 +123,9 @@ public partial class MainWindow : Window
 
     // Дополнения.
     private readonly DispatcherTimer _titleTimer = new() { Interval = TimeSpan.FromSeconds(3.6) };
-    private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromMilliseconds(1500) };
+    private readonly DispatcherTimer _statsTimer = new() { Interval = TimeSpan.FromMilliseconds(1000) };
+    private double _cpuSmooth = -1;
+    private double _ramSmooth = -1;
     private readonly DispatcherTimer _fullscreenTimer = new() { Interval = TimeSpan.FromMilliseconds(1000) };
     private bool _hiddenByFullscreen;
 
@@ -618,7 +620,7 @@ public partial class MainWindow : Window
         }
 
         UpdateTitleDisplay();
-        ExpandedPanel.Height = ExpandedH - 40.0;
+        ExpandedPanel.Height = ExpandedH - 34.0;
 
         _expandTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, s.ExpandDelayMs));
         _collapseTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, s.CollapseDelayMs));
@@ -665,12 +667,25 @@ public partial class MainWindow : Window
     private void UpdateStats()
     {
         if (!_expanded || !S.ShowSystemStats) return;
+
         var cpu = SystemStats.CpuPercent();
         var ram = SystemStats.MemoryPercent();
-        CpuText.Text = $"{cpu:0}%";
-        RamText.Text = $"{ram:0}%";
-        CpuFill.Width = CpuTrack.ActualWidth * cpu / 100.0;
-        RamFill.Width = RamTrack.ActualWidth * ram / 100.0;
+        _cpuSmooth = _cpuSmooth < 0 ? cpu : _cpuSmooth * 0.5 + cpu * 0.5;
+        _ramSmooth = _ramSmooth < 0 ? ram : _ramSmooth * 0.5 + ram * 0.5;
+
+        CpuText.Text = $"{_cpuSmooth:0}%";
+        RamText.Text = $"{_ramSmooth:0}%";
+        AnimateFill(CpuFill, CpuTrack.ActualWidth * _cpuSmooth / 100.0);
+        AnimateFill(RamFill, RamTrack.ActualWidth * _ramSmooth / 100.0);
+    }
+
+    private static void AnimateFill(FrameworkElement fill, double width)
+    {
+        var animation = new DoubleAnimation(Math.Max(0, width), TimeSpan.FromMilliseconds(600))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        fill.BeginAnimation(FrameworkElement.WidthProperty, animation);
     }
 
     // ---------- Полноэкранные игры и видео ----------

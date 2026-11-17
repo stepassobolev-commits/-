@@ -8,7 +8,7 @@
     <AssemblyName>DynamicIsland</AssemblyName>
     <RootNamespace>DynamicIsland</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.8.0</Version>
+    <Version>0.9.0</Version>
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
