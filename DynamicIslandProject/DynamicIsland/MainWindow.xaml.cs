@@ -114,6 +114,7 @@ public partial class MainWindow : Window
     private int _winY = int.MinValue;
     private int _winW;
     private int _winH;
+    private bool _prewide;
     private DateTime _deviceStamp = DateTime.MinValue;
 
     // Музыка: спектр, цвет обложки, название в капсуле.
@@ -339,9 +340,10 @@ public partial class MainWindow : Window
         var widthPx = islandW;
         var heightPx = top + islandH;
 
-        if (!exact)
+        if (exact) _prewide = false;
+        else
         {
-            var wide = _target > 0 || _p > 0.002;
+            var wide = _prewide || _target > 0 || _p > 0.002;
             var boundW = wide ? ExpandedW * 1.12 : (s.CompactWidth + s.MediaExtraWidth + s.TitleExtraWidth) * 1.15;
             var boundH = wide ? ExpandedH * 1.12 + 2.0 : s.CompactHeight * 1.15 + 2.0;
             widthPx = Math.Max(widthPx, EvenPx(boundW * k));
@@ -391,6 +393,14 @@ public partial class MainWindow : Window
     {
         _collapseTimer.Stop();
         if (_expanded || !S.ExpandOnHover) return;
+
+        // Окно увеличиваем заранее, пока мышь только подошла: само раскрытие тогда стартует без рывка.
+        if (_smoothReady && !_rendering && !_prewide)
+        {
+            _prewide = true;
+            PositionSmoothWindow(RootBorder.Width, RootBorder.Height, false);
+        }
+
         if (S.ExpandDelayMs <= 0)
         {
             Expand();
@@ -428,6 +438,14 @@ public partial class MainWindow : Window
         if (Mouse.LeftButton == MouseButtonState.Pressed || IslandMenu.IsOpen)
         {
             _collapseTimer.Start();
+            return;
+        }
+
+        // Мышь ушла, не раскрыв остров: возвращаем окну точный размер.
+        if (!_expanded && !_rendering)
+        {
+            if (_prewide && _smoothReady) PositionSmoothWindow(RootBorder.Width, RootBorder.Height);
+            _prewide = false;
             return;
         }
         Collapse();
