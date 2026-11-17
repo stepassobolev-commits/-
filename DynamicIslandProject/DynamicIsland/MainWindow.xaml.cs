@@ -110,12 +110,6 @@ public partial class MainWindow : Window
     private double _cacheScale;
     private IntPtr _hwnd;
     private bool _smoothReady;
-    private int _winX = int.MinValue;
-    private int _winY = int.MinValue;
-    private int _winW;
-    private int _winH;
-    private bool _prewide;
-    private DateTime _deviceStamp = DateTime.MinValue;
 
     // Музыка: спектр, цвет обложки, название в капсуле.
     private AudioSpectrum? _spectrum;
@@ -225,16 +219,6 @@ public partial class MainWindow : Window
         {
             PositionWindow();
             UpdateClock();
-
-            // «Прогрев»: раскрытая панель строится один раз заранее, чтобы первое раскрытие не подтормаживало.
-            try
-            {
-                ExpandedPanel.Visibility = Visibility.Visible;
-                UpdateLayout();
-                ApplyProgress();
-            }
-            catch { }
-
             _clockTimer.Tick += (_, _) => OnClockTick();
             _clockTimer.Start();
 
@@ -286,89 +270,26 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Сколько физических пикселей в одной единице разметки острова (масштаб × DPI).</summary>
-    private double PixelsPerUnit()
-    {
-        var scale = Math.Clamp(S.UiScale, 0.5, 1.5);
-        var dpi = 1.0;
-        try { dpi = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
-        return Math.Max(0.5, scale * dpi);
-    }
-
-    /// <summary>Чётное число пикселей: тогда остров ровно по центру окна, без полупикселей (они дают мыло и дрожание).</summary>
-    private static int EvenPx(double px)
-    {
-        var v = Math.Max(2, (int)Math.Round(px));
-        return v % 2 == 0 ? v : v + 1;
-    }
-
-    /// <summary>Рабочая область основного монитора в физических пикселях.</summary>
-    private RectInt PrimaryWorkAreaPx()
-    {
-        try
-        {
-            var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-            var monitor = MonitorFromWindow(IntPtr.Zero, 1); // MONITOR_DEFAULTTOPRIMARY
-            if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref info)) return info.Work;
-        }
-        catch { }
-
-        var dpi = 1.0;
-        try { dpi = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
-        return new RectInt
-        {
-            Left = 0,
-            Top = 0,
-            Right = (int)Math.Round(SystemParameters.PrimaryScreenWidth * dpi),
-            Bottom = (int)Math.Round(SystemParameters.PrimaryScreenHeight * dpi)
-        };
-    }
-
-    /// <summary>
-    /// Размер и положение окна. Во время движения окно НЕ меняет размер каждый кадр (это и давало тряску):
-    /// оно один раз растёт до максимума, а точно по острову подгоняется, когда движение закончилось.
-    /// </summary>
-    private void PositionSmoothWindow(double localWidth, double localHeight, bool exact = true)
+    /// <summary>Размер и положение окна точно по острову: прозрачные края не перехватывают мышь.</summary>
+    private void PositionSmoothWindow(double localWidth, double localHeight)
     {
         if (!_smoothReady || _hwnd == IntPtr.Zero || double.IsNaN(localWidth) || double.IsNaN(localHeight)) return;
 
         var s = S;
-        var k = PixelsPerUnit();
-        var top = (int)Math.Round(s.TopOffset * k);
-        var islandW = EvenPx(localWidth * k);
-        var islandH = Math.Max(1, (int)Math.Round(localHeight * k));
-        var widthPx = islandW;
-        var heightPx = top + islandH;
+        var scale = Math.Clamp(s.UiScale, 0.5, 1.5);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var area = SystemParameters.WorkArea;
 
-        if (exact) _prewide = false;
-        else
-        {
-            var wide = _prewide || _target > 0 || _p > 0.002;
-            var boundW = wide ? ExpandedW * 1.12 : (s.CompactWidth + s.MediaExtraWidth + s.TitleExtraWidth) * 1.15;
-            var boundH = wide ? ExpandedH * 1.12 + 2.0 : s.CompactHeight * 1.15 + 2.0;
-            widthPx = Math.Max(widthPx, EvenPx(boundW * k));
-            heightPx = Math.Max(heightPx, top + (int)Math.Ceiling(boundH * k));
-        }
+        var widthDip = Math.Max(1.0, localWidth * scale);
+        var heightDip = Math.Max(1.0, (s.TopOffset + localHeight) * scale);
 
-        var area = PrimaryWorkAreaPx();
-        var xPx = area.Left + (area.Right - area.Left - widthPx) / 2;
-        var yPx = area.Top;
-        if (xPx == _winX && yPx == _winY && widthPx == _winW && heightPx == _winH) return;
-
-        _winX = xPx;
-        _winY = yPx;
-        _winW = widthPx;
-        _winH = heightPx;
+        var widthPx = (int)Math.Ceiling(widthDip * dpi.DpiScaleX);
+        var heightPx = (int)Math.Ceiling(heightDip * dpi.DpiScaleY);
+        var xPx = (int)Math.Round((area.Left + (area.Width - widthDip) / 2.0) * dpi.DpiScaleX);
+        var yPx = (int)Math.Round(area.Top * dpi.DpiScaleY);
 
         // SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOCOPYBITS
         SetWindowPos(_hwnd, IntPtr.Zero, xPx, yPx, widthPx, heightPx, 0x0004 | 0x0010 | 0x0100);
-    }
-
-    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
-    {
-        base.OnDpiChanged(oldDpi, newDpi);
-        _winW = 0;
-        if (_ready) ApplyProgress();
     }
 
     // ---------- Положение окна ----------
@@ -381,10 +302,8 @@ public partial class MainWindow : Window
             return;
         }
         var area = SystemParameters.WorkArea;
-        var dpiX = 1.0;
-        try { dpiX = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
-        Left = Math.Round((area.Left + (area.Width - Width) / 2) * dpiX) / dpiX;
-        Top = Math.Round(area.Top * dpiX) / dpiX;
+        Left = area.Left + (area.Width - Width) / 2;
+        Top = area.Top;
     }
 
     // ---------- Наведение мыши ----------
@@ -393,14 +312,6 @@ public partial class MainWindow : Window
     {
         _collapseTimer.Stop();
         if (_expanded || !S.ExpandOnHover) return;
-
-        // Окно увеличиваем заранее, пока мышь только подошла: само раскрытие тогда стартует без рывка.
-        if (_smoothReady && !_rendering && !_prewide)
-        {
-            _prewide = true;
-            PositionSmoothWindow(RootBorder.Width, RootBorder.Height, false);
-        }
-
         if (S.ExpandDelayMs <= 0)
         {
             Expand();
@@ -438,14 +349,6 @@ public partial class MainWindow : Window
         if (Mouse.LeftButton == MouseButtonState.Pressed || IslandMenu.IsOpen)
         {
             _collapseTimer.Start();
-            return;
-        }
-
-        // Мышь ушла, не раскрыв остров: возвращаем окну точный размер.
-        if (!_expanded && !_rendering)
-        {
-            if (_prewide && _smoothReady) PositionSmoothWindow(RootBorder.Width, RootBorder.Height);
-            _prewide = false;
             return;
         }
         Collapse();
@@ -486,9 +389,7 @@ public partial class MainWindow : Window
 
     private void SetMediaWide(bool wide)
     {
-        var newTarget = wide ? 1.0 : 0.0;
-        if (_wTarget == newTarget) return; // таймер плеера зовёт это каждые 1,5 с — без изменений ничего не запускаем
-        _wTarget = newTarget;
+        _wTarget = wide ? 1.0 : 0.0;
         if (!S.AnimationsEnabled)
         {
             _wp = _wTarget;
@@ -504,9 +405,6 @@ public partial class MainWindow : Window
         if (_rendering) return;
         _rendering = true;
         _lastRender = TimeSpan.Zero;
-        // Окно увеличиваем заранее, до первого кадра движения (только при реальном движении).
-        if (_smoothReady && (Math.Abs(_p - _target) > 0.002 || Math.Abs(_wp - _wTarget) > 0.002 || Math.Abs(_tp - _tTarget) > 0.002))
-            PositionSmoothWindow(RootBorder.Width, RootBorder.Height, false);
         CompositionTarget.Rendering += OnRendering;
     }
 
@@ -574,16 +472,13 @@ public partial class MainWindow : Window
         if (settledP && settledW && settledT)
         {
             StopRendering();
-            if (_smoothReady) PositionSmoothWindow(RootBorder.Width, RootBorder.Height); // окно точно по острову
             OnMotionSettled();
         }
     }
 
     private void SetTitleWide(bool wide)
     {
-        var newTarget = wide ? 1.0 : 0.0;
-        if (_tTarget == newTarget) return;
-        _tTarget = newTarget;
+        _tTarget = wide ? 1.0 : 0.0;
         if (!S.AnimationsEnabled)
         {
             _tp = _tTarget;
@@ -598,15 +493,9 @@ public partial class MainWindow : Window
     private void OnMotionSettled()
     {
         if (!_expanded) return;
-
-        // Не в тот же кадр, где закончилась анимация: иначе слышен «подлаг» в самом конце раскрытия.
-        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, new Action(() =>
-        {
-            if (!_expanded) return;
-            RefreshVolume();
-            _ = RefreshMediaAsync();
-            UpdateStats();
-        }));
+        RefreshVolume();
+        _ = RefreshMediaAsync();
+        UpdateStats();
     }
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
@@ -620,14 +509,10 @@ public partial class MainWindow : Window
         var s = S;
         var compactNow = s.CompactWidth + s.MediaExtraWidth * Math.Clamp(_wp, 0.0, 1.15)
                          + s.TitleExtraWidth * Math.Clamp(_tp, 0.0, 1.1);
-        // Размеры острова всегда в целых физических пикселях: края остаются резкими, ничего не дрожит.
-        var k = PixelsPerUnit();
-        var width = EvenPx(Lerp(compactNow, ExpandedW, g) * k) / k;
-        var height = Math.Max(1, (int)Math.Round(Lerp(s.CompactHeight, ExpandedH, g) * k)) / k;
+        var width = Lerp(compactNow, ExpandedW, g);
+        var height = Lerp(s.CompactHeight, ExpandedH, g);
         RootBorder.Width = width;
         RootBorder.Height = height;
-        RootBorder.Margin = new Thickness(0, Math.Round(s.TopOffset * k) / k, 0, 0);
-        RootBorder.BorderThickness = new Thickness(1.0 / k);
 
         var radius = Math.Min(Lerp(s.CompactRadius, s.ExpandedRadius, Clamp01(g)), Math.Min(width, height) / 2.0);
         var topRadius = s.FlatTop ? 0.0 : radius;
@@ -645,10 +530,9 @@ public partial class MainWindow : Window
         var compactVisibility = compactOpacity > 0.01 ? Visibility.Visible : Visibility.Collapsed;
         if (CompactPanel.Visibility != compactVisibility) CompactPanel.Visibility = compactVisibility;
 
-        PanelShift.Y = Math.Round((1.0 - Clamp01(p)) * -14.0 * k) / k;
+        PanelShift.Y = (1.0 - Clamp01(p)) * -14.0;
 
-        // Пока идёт движение, размер окна не трогаем (см. PositionSmoothWindow).
-        if (_smoothReady) PositionSmoothWindow(width, height, !_rendering);
+        if (_smoothReady) PositionSmoothWindow(width, height);
     }
 
     // ---------- Часы ----------
@@ -737,7 +621,6 @@ public partial class MainWindow : Window
 
         UpdateTitleDisplay();
         ExpandedPanel.Height = ExpandedH - 34.0;
-        ExpandedPanel.Width = 308.0;
 
         _expandTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, s.ExpandDelayMs));
         _collapseTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1, s.CollapseDelayMs));
@@ -873,9 +756,7 @@ public partial class MainWindow : Window
         }
         var s = S;
         var scale = Math.Clamp(s.UiScale, 0.5, 1.5);
-        var dpiX = 1.0;
-        try { dpiX = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
-        var width = EvenPx((ExpandedW + 80.0) * scale * dpiX) / dpiX; // чётное число пикселей — остров ровно по центру
+        var width = (ExpandedW + 80.0) * scale;
         var height = (s.TopOffset + ExpandedH * 1.1 + 24.0) * scale;
         if (Math.Abs(Width - width) > 0.5) Width = width;
         if (Math.Abs(Height - height) > 0.5) Height = height;
@@ -1327,13 +1208,8 @@ public partial class MainWindow : Window
         if (VolumeSlider.IsMouseCaptureWithin) return;
         try
         {
-            // Устройство вывода перечисляем не чаще раза в 10 секунд: это медленный вызов.
-            if (_audioDevice is null || (DateTime.UtcNow - _deviceStamp).TotalSeconds > 10)
-            {
-                _audioDevice?.Dispose();
-                _audioDevice = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-                _deviceStamp = DateTime.UtcNow;
-            }
+            _audioDevice?.Dispose();
+            _audioDevice = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
             _volumeUpdateFromCode = true;
             VolumeSlider.Value = Math.Clamp(_audioDevice.AudioEndpointVolume.MasterVolumeLevelScalar * 100, 0, 100);
             _volumeUpdateFromCode = false;
