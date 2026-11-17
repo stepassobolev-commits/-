@@ -468,7 +468,9 @@ public partial class MainWindow : Window
 
     private void SetMediaWide(bool wide)
     {
-        _wTarget = wide ? 1.0 : 0.0;
+        var newTarget = wide ? 1.0 : 0.0;
+        if (_wTarget == newTarget) return; // таймер плеера зовёт это каждые 1,5 с — без изменений ничего не запускаем
+        _wTarget = newTarget;
         if (!S.AnimationsEnabled)
         {
             _wp = _wTarget;
@@ -484,8 +486,9 @@ public partial class MainWindow : Window
         if (_rendering) return;
         _rendering = true;
         _lastRender = TimeSpan.Zero;
-        // Окно увеличиваем заранее, до первого кадра анимации.
-        if (_smoothReady) PositionSmoothWindow(RootBorder.Width, RootBorder.Height, false);
+        // Окно увеличиваем заранее, до первого кадра движения (только при реальном движении).
+        if (_smoothReady && (Math.Abs(_p - _target) > 0.002 || Math.Abs(_wp - _wTarget) > 0.002 || Math.Abs(_tp - _tTarget) > 0.002))
+            PositionSmoothWindow(RootBorder.Width, RootBorder.Height, false);
         CompositionTarget.Rendering += OnRendering;
     }
 
@@ -560,7 +563,9 @@ public partial class MainWindow : Window
 
     private void SetTitleWide(bool wide)
     {
-        _tTarget = wide ? 1.0 : 0.0;
+        var newTarget = wide ? 1.0 : 0.0;
+        if (_tTarget == newTarget) return;
+        _tTarget = newTarget;
         if (!S.AnimationsEnabled)
         {
             _tp = _tTarget;
